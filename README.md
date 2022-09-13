@@ -29,7 +29,16 @@ s.Stop()
 
 ## Performance
 
-Less than `1us/op`
+Less than `1us/op` on Apple MacBook Air (M1)
+
+```
+goos: darwin
+goarch: arm64
+pkg: github.com/guoyk93/snowid
+BenchmarkGenerator_NewID-8       2465515               469.5 ns/op
+PASS
+ok      github.com/guoyk93/snowid       1.742s
+```
 
 ## Upstream
 
