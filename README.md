@@ -42,13 +42,13 @@ ok      github.com/guoyk93/snowid       1.742s
 
 ## Upstream
 
-https://git.guoyk.net/go-guoyk/snowflake
+<https://git.guoyk.net/go-guoyk/snowflake>
 
 Due to various reasons, codebase is detached from upstream.
 
 ## Donation
 
-![oss-donation-wx](https://www.guoyk.net/oss-donation-wx.png)
+View <https://guoyk93.github.io/#donation>
 
 ## Credits
 
