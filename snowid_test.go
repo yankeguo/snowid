@@ -1,118 +1,178 @@
 package snowid
 
 import (
+	"github.com/stretchr/testify/require"
+	"math/rand"
 	"testing"
 	"time"
 )
 
 var (
-	testInstanceID = uint64(1) | uint64(1)<<9
-	testStartTime  = time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC)
+	testEpoch = time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
 )
 
-type testClockForSleep struct {
-	defaultClock
+func TestConstants(t *testing.T) {
+	require.Equal(t, Uint41Mask, Uint40Mask|Uint40Bit)
 }
 
-func (tcfs testClockForSleep) Since(t time.Time) time.Duration {
-	return tcfs.defaultClock.Since(t) / 100
+type testClock struct {
+	since func(t time.Time) time.Duration
+	sleep func(d time.Duration)
 }
 
-func (tcfs testClockForSleep) Sleep(d time.Duration) {
-	tcfs.defaultClock.Sleep(d)
+func (tc *testClock) Since(t time.Time) time.Duration {
+	return tc.since(t)
 }
 
-func TestNew_Sleep(t *testing.T) {
-	s, _ := New(Options{
-		ID:    0b11111111,
-		Epoch: testStartTime,
-		Clock: testClockForSleep{},
+func (tc *testClock) Sleep(d time.Duration) {
+	tc.sleep(d)
+}
+
+func TestNew(t *testing.T) {
+	t.Run("error-on-invalid-epoch", func(t *testing.T) {
+		_, err := New(Options{})
+		require.Equal(t, ErrInvalidEpoch, err)
 	})
-	defer s.Stop()
-	for i := 0; i < 20000; i++ {
-		_ = s.NewID()
-	}
+
+	t.Run("error-on-invalid-id", func(t *testing.T) {
+		_, err := New(Options{
+			Epoch: time.Now(),
+			ID:    Uint41Mask,
+		})
+		require.Equal(t, ErrInvalidID, err)
+	})
+
+	t.Run("default", func(t *testing.T) {
+		g, err := New(Options{
+			Epoch: testEpoch,
+		})
+		require.NoError(t, err)
+		defer g.Stop()
+
+		require.NotEqualValues(t, 0, g.NewID())
+	})
 }
 
-func TestNew_BadID_BadEpoch(t *testing.T) {
-	_, err := New(Options{})
-	if err == nil {
-		t.Error("should failed")
-	}
-	_, err = New(Options{
-		Epoch: testStartTime,
-		ID:    0b11111111111,
+func TestGenerator(t *testing.T) {
+	t.Run("error-on-stopped", func(t *testing.T) {
+		g, err := New(Options{
+			Epoch: testEpoch,
+		})
+		require.NoError(t, err)
+		require.PanicsWithError(t, ErrStopped.Error(), func() {
+			g.Stop()
+			g.NewID()
+		})
 	})
-	if err == nil {
-		t.Error("should failed")
-	}
+
+	t.Run("standard-and-with-overflow", func(t *testing.T) {
+		var sleepInvoked int64
+
+		customGrain := time.Duration(rand.Intn(20)+10) * time.Millisecond
+
+		tc := &testClock{
+			since: func(t time.Time) time.Duration {
+				return 11*customGrain + time.Duration(sleepInvoked)*customGrain
+			},
+			sleep: func(d time.Duration) {
+				require.Equal(t, customGrain, d)
+				sleepInvoked++
+			},
+		}
+
+		g, err := New(Options{
+			Epoch: testEpoch,
+			ID:    0b111111,
+			Grain: customGrain,
+			Clock: tc,
+		})
+		require.NoError(t, err)
+		defer g.Stop()
+
+		for i := uint64(0); i < 4096; i++ {
+			require.Equal(t, 11<<22|0b111111<<12|i, g.NewID())
+		}
+		for i := uint64(0); i < 4096; i++ {
+			require.Equal(t, 12<<22|0b111111<<12|i, g.NewID())
+		}
+		require.Equal(t, int64(1), sleepInvoked)
+		require.Equal(t, uint64(4096*2), g.Count())
+	})
+
+	t.Run("standard-and-with-overflow-leading-bit", func(t *testing.T) {
+		var sleepInvoked int64
+
+		customGrain := time.Duration(rand.Intn(20)+10) * time.Millisecond
+
+		tc := &testClock{
+			since: func(t time.Time) time.Duration {
+				return 11*customGrain + time.Duration(sleepInvoked)*customGrain
+			},
+			sleep: func(d time.Duration) {
+				require.Equal(t, customGrain, d)
+				sleepInvoked++
+			},
+		}
+
+		g, err := New(Options{
+			Epoch:      testEpoch,
+			ID:         0b111111,
+			Grain:      customGrain,
+			Clock:      tc,
+			LeadingBit: true,
+		})
+		require.NoError(t, err)
+		defer g.Stop()
+
+		for i := uint64(0); i < 4096; i++ {
+			require.Equal(t, 1<<62|11<<22|0b111111<<12|i, g.NewID())
+		}
+		for i := uint64(0); i < 4096; i++ {
+			require.Equal(t, 1<<62|12<<22|0b111111<<12|i, g.NewID())
+		}
+		require.Equal(t, int64(1), sleepInvoked)
+		require.Equal(t, uint64(4096*2), g.Count())
+	})
+
+	t.Run("samples", func(t *testing.T) {
+		g, err := New(Options{
+			Epoch: testEpoch,
+			ID:    0b1010101,
+		})
+		require.NoError(t, err)
+		defer g.Stop()
+
+		for i := 0; i < 5; i++ {
+			t.Log("ID:", g.NewID())
+		}
+	})
+
+	t.Run("samples-leading-bit", func(t *testing.T) {
+		g, err := New(Options{
+			Epoch:      testEpoch,
+			ID:         0b1010101,
+			LeadingBit: true,
+		})
+		require.NoError(t, err)
+		defer g.Stop()
+
+		for i := 0; i < 5; i++ {
+			t.Log("ID:", g.NewID())
+		}
+	})
+
 }
 
 func BenchmarkGenerator_NewID(b *testing.B) {
-	s, _ := New(Options{
-		Epoch: testStartTime,
-		ID:    testInstanceID,
+	g, err := New(Options{
+		Epoch:      testEpoch,
+		ID:         0b1010101,
+		LeadingBit: true,
 	})
-	defer s.Stop()
+	require.NoError(b, err)
+	defer g.Stop()
+
 	for n := 0; n < b.N; n++ {
-		s.NewID()
-	}
-}
-
-func TestGenerator_NewID(t *testing.T) {
-	s, _ := New(Options{
-		Epoch: testStartTime,
-		ID:    testInstanceID,
-	})
-	defer s.Stop()
-	var id uint64
-	for i := 0; i < 10; i++ {
-		id = s.NewID()
-	}
-	if s.Count() != 10 {
-		t.Fatal("bad number of count")
-	}
-	t.Logf("ins: %b, seq: %b, mask: %b, id: %b", testInstanceID, id&Uint12Mask, Uint12Mask, id)
-	t.Logf("ins: %x, seq: %x, mask: %x, id: %x", testInstanceID, id&Uint12Mask, Uint12Mask, id)
-	t.Logf("ins: %d, seq: %d, mask: %d, id: %d", testInstanceID, id&Uint12Mask, Uint12Mask, id)
-	if id&Uint12Mask != 9 {
-		t.Fatal("bad sequence id")
-	}
-	if (id>>12)&Uint10Mask != testInstanceID {
-		t.Fatal("bad instance id")
-	}
-	if time.Since(testStartTime)/time.Second != time.Duration(id>>22)*time.Millisecond/time.Second {
-		t.Fatal("bad timestamp")
-	}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("The code did not panic")
-		} else {
-			t.Logf("%v", r)
-		}
-	}()
-	s2, _ := New(Options{
-		Epoch: testStartTime,
-		ID:    testInstanceID,
-	})
-	s2.Stop()
-	s2.NewID()
-}
-
-func TestGenerator_CheckDup(t *testing.T) {
-	s, _ := New(Options{
-		Epoch: testStartTime,
-		ID:    testInstanceID,
-	})
-	defer s.Stop()
-
-	out := map[uint64]bool{}
-
-	for i := 0; i < 100000; i++ {
-		id := s.NewID()
-		if out[id] {
-			t.Fatal("duplicated")
-		}
-		out[id] = true
+		g.NewID()
 	}
 }

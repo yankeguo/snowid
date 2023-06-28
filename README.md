@@ -4,20 +4,22 @@
 
 A concurrent-safe lock-free implementation of snowflake algorithm in Golang
 
-## Get
+## Install
 
 `go get -u github.com/guoyk93/snowflake`
 
 ## Usage
 
 ```go
-// assign a unique identifier
+// create an unique identifier
 id, _ := strconv.ParseUint(os.Getenv("WORKER_ID"), 10, 64)
 
-// create a instance
+// create an instance (a sonyflake like instance)
 s := snowflake.New(snowflake.Options{
     Epoch: time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
     ID: id,
+    Grain: time.Millisecond*10,
+    LeadingBit: true,
 })
 
 // get a id
@@ -25,6 +27,7 @@ s.NewID()
 
 // stop and release all related resource
 s.Stop()
+
 ```
 
 ## Performance
@@ -39,12 +42,6 @@ BenchmarkGenerator_NewID-8       2465515               469.5 ns/op
 PASS
 ok      github.com/guoyk93/snowid       1.742s
 ```
-
-## Upstream
-
-<https://git.guoyk.net/go-guoyk/snowflake>
-
-Due to various reasons, codebase is detached from upstream.
 
 ## Donation
 

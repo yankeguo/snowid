@@ -9,6 +9,8 @@ const (
 	Uint10Mask = (uint64(1) << 10) - 1
 	Uint12Mask = (uint64(1) << 12) - 1
 	Uint41Mask = (uint64(1) << 41) - 1
+	Uint40Mask = (uint64(1) << 40) - 1
+	Uint40Bit  = uint64(1) << 40
 )
 
 var (
@@ -48,6 +50,10 @@ type Options struct {
 
 	// ID unique unsigned integer indicate the ID of current Generator instance, maximum 10 bits wide, default to 0
 	ID uint64
+
+	// LeadingBit whether to fill leadingBit bit in ID, default to false
+	// If you are planning to use the ID in a string field, this will ensure the ID is always the same length
+	LeadingBit bool
 }
 
 // Generator the main interface
@@ -64,14 +70,15 @@ type Generator interface {
 }
 
 type generator struct {
-	chReq     chan struct{}
-	chResp    chan uint64
-	chStop    chan struct{}
-	epoch     time.Time
-	grain     time.Duration
-	shiftedID uint64
-	count     uint64
-	clock     Clock
+	chReq      chan struct{}
+	chResp     chan uint64
+	chStop     chan struct{}
+	epoch      time.Time
+	grain      time.Duration
+	leadingBit bool
+	shiftedID  uint64
+	count      uint64
+	clock      Clock
 }
 
 // New create a new instance of Generator
@@ -89,13 +96,14 @@ func New(opts Options) (Generator, error) {
 		opts.Grain = time.Millisecond
 	}
 	sf := &generator{
-		chReq:     make(chan struct{}),
-		chResp:    make(chan uint64),
-		chStop:    make(chan struct{}),
-		epoch:     opts.Epoch,
-		grain:     opts.Grain,
-		shiftedID: opts.ID << 12,
-		clock:     opts.Clock,
+		chReq:      make(chan struct{}),
+		chResp:     make(chan uint64),
+		chStop:     make(chan struct{}),
+		epoch:      opts.Epoch,
+		grain:      opts.Grain,
+		leadingBit: opts.LeadingBit,
+		shiftedID:  opts.ID << 12,
+		clock:      opts.Clock,
 	}
 	go sf.run()
 	return sf, nil
@@ -123,7 +131,11 @@ func (sf *generator) run() {
 				seqID = 0
 			}
 			sf.count++
-			sf.chResp <- ((nowT & Uint41Mask) << 22) | sf.shiftedID | seqID
+			if sf.leadingBit {
+				sf.chResp <- (((nowT & Uint40Mask) | Uint40Bit) << 22) | sf.shiftedID | seqID
+			} else {
+				sf.chResp <- ((nowT & Uint41Mask) << 22) | sf.shiftedID | seqID
+			}
 		case <-sf.chStop:
 			return
 		}
