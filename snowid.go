@@ -43,6 +43,9 @@ type Options struct {
 	Clock Clock
 	// Epoch pre-defined zero time in Snowflake algorithm, required
 	Epoch time.Time
+	// Grain time grain of ID, default to millisecond, minimum to millisecond
+	Grain time.Duration
+
 	// ID unique unsigned integer indicate the ID of current Generator instance, maximum 10 bits wide, default to 0
 	ID uint64
 }
@@ -65,6 +68,7 @@ type generator struct {
 	chResp    chan uint64
 	chStop    chan struct{}
 	epoch     time.Time
+	grain     time.Duration
 	shiftedID uint64
 	count     uint64
 	clock     Clock
@@ -81,11 +85,15 @@ func New(opts Options) (Generator, error) {
 	if opts.ID&Uint10Mask != opts.ID {
 		return nil, ErrInvalidID
 	}
+	if opts.Grain <= time.Millisecond {
+		opts.Grain = time.Millisecond
+	}
 	sf := &generator{
 		chReq:     make(chan struct{}),
 		chResp:    make(chan uint64),
 		chStop:    make(chan struct{}),
 		epoch:     opts.Epoch,
+		grain:     opts.Grain,
 		shiftedID: opts.ID << 12,
 		clock:     opts.Clock,
 	}
@@ -103,11 +111,11 @@ func (sf *generator) run() {
 		select {
 		case <-sf.chReq:
 		retry:
-			nowT = uint64(sf.clock.Since(sf.epoch) / time.Millisecond)
+			nowT = uint64(sf.clock.Since(sf.epoch) / sf.grain)
 			if nowT == lastT {
 				seqID = seqID + 1
 				if seqID > Uint12Mask {
-					sf.clock.Sleep(time.Millisecond)
+					sf.clock.Sleep(sf.grain)
 					goto retry
 				}
 			} else {
