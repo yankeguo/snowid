@@ -1,4 +1,4 @@
-module github.com/guoyk93/snowid
+module github.com/yankeguo/snowid
 
 go 1.18
 

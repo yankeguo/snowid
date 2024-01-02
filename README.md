@@ -1,13 +1,13 @@
 # snowid
 
-[![workflow badge](https://github.com/guoyk93/snowid/actions/workflows/go.yml/badge.svg)](https://github.com/guoyk93/snowid/actions)
-[![Go Reference](https://pkg.go.dev/badge/github.com/guoyk93/snowid.svg)](https://pkg.go.dev/github.com/guoyk93/snowid)
+[![workflow badge](https://github.com/yankeguo/snowid/actions/workflows/go.yml/badge.svg)](https://github.com/yankeguo/snowid/actions)
+[![Go Reference](https://pkg.go.dev/badge/github.com/yankeguo/snowid.svg)](https://pkg.go.dev/github.com/yankeguo/snowid)
 
 A concurrent-safe lock-free implementation of snowflake algorithm in Golang
 
 ## Install
 
-`go get -u github.com/guoyk93/snowid`
+`go get -u github.com/yankeguo/snowid`
 
 ## Usage
 
@@ -38,15 +38,11 @@ Less than `1us/op` on **Apple MacBook Air (M1)**
 ```
 goos: darwin
 goarch: arm64
-pkg: github.com/guoyk93/snowid
+pkg: github.com/yankeguo/snowid
 BenchmarkGenerator_NewID-8       2465515               469.5 ns/op
 PASS
-ok      github.com/guoyk93/snowid       1.742s
+ok      github.com/yankeguo/snowid       1.742s
 ```
-
-## Donation
-
-View https://guoyk.xyz/donation
 
 ## Credits
 
