@@ -2,6 +2,7 @@
 
 [![workflow badge](https://github.com/yankeguo/snowid/actions/workflows/go.yml/badge.svg)](https://github.com/yankeguo/snowid/actions)
 [![Go Reference](https://pkg.go.dev/badge/github.com/yankeguo/snowid.svg)](https://pkg.go.dev/github.com/yankeguo/snowid)
+[![codecov](https://codecov.io/gh/yankeguo/snowid/graph/badge.svg?token=MAMV3GWQ8R)](https://codecov.io/gh/yankeguo/snowid)
 
 A concurrent-safe lock-free implementation of snowflake algorithm in Golang
 
